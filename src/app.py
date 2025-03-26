@@ -8,7 +8,7 @@ def analyze():
     if not file:
         return jsonify({"error": "No file uploaded"}), 400
     
-    # Process DXF file here
+    # DXF file processing logic here
     return jsonify({"message": "File processed successfully"})
 
 if __name__ == "__main__":
