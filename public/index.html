@@ -23,7 +23,7 @@
             let formData = new FormData();
             formData.append("file", file);
 
-            let response = await fetch("https://your-project.vercel.app/analyze", {
+            let response = await fetch("https://cbde-taupe.vercel.app/api/analyze", {  // Updated API URL
                 method: "POST",
                 body: formData
             });
