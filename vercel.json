@@ -1,11 +1,9 @@
 {
     "version": 2,
     "builds": [
-      { "src": "src/app.py", "use": "@vercel/python" },
-      { "src": "public/**", "use": "@vercel/static" }
+        { "src": "src/app.py", "use": "@vercel/python", "config": { "runtime": "python3.9" } }
     ],
     "routes": [
-      { "src": "/analyze", "dest": "src/app.py" },
-      { "src": "/(.*)", "dest": "public/index.html" }
+        { "src": "/api/analyze", "dest": "src/app.py" }
     ]
-  }
+}
