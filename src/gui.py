@@ -1,55 +1,28 @@
-import tkinter as tk
-from tkinter import ttk, filedialog
-from dxf_processor import DXFProcessor
-from calculations import Calculations
+def process_file(self):
+    """Processes the DXF file and calculates the correct dimensions and perimeter."""
+    processor = DXFProcessor(self.file_path)
+    processor.load_dxf()
+    self.entities = processor.get_lines() + processor.get_polylines()
 
-class BlueprintIQApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("BlueprintIQ")
-        self.root.geometry("800x600")
+    # Compute dimensions
+    l, L, b, B = Calculations.calculate_dimensions(self.entities)
 
-        self.file_path = None
-        self.entities = []
+    # Compute perimeter
+    perimeter = Calculations.calculate_perimeter(l, L, b, B)
 
-        self.create_home_screen()
+    self.show_results(l, L, b, B, perimeter)
 
-    def create_home_screen(self):
-        """Home screen UI."""
-        frame = ttk.Frame(self.root)
-        frame.pack(expand=True, fill=tk.BOTH)
+def show_results(self, l, L, b, B, perimeter):
+    """Displays the calculated results."""
+    self.clear_frame()
 
-        title = ttk.Label(frame, text="BlueprintIQ - DXF Analyzer", font=("Helvetica", 18, "bold"))
-        title.pack(pady=20)
+    result_text = f"""
+    Internal Length (l): {l:.2f} units
+    External Length (L): {L:.2f} units
+    Internal Breadth (b): {b:.2f} units
+    External Breadth (B): {B:.2f} units
+    Perimeter: {perimeter:.2f} units
+    """
 
-        select_btn = ttk.Button(frame, text="Select DXF File", command=self.select_file)
-        select_btn.pack(pady=10)
-
-    def select_file(self):
-        """Opens file dialog to select DXF file."""
-        self.file_path = filedialog.askopenfilename(filetypes=[("DXF files", "*.dxf")])
-        if self.file_path:
-            self.process_file()
-
-    def process_file(self):
-        """Processes the DXF file and calculates metrics."""
-        processor = DXFProcessor(self.file_path)
-        processor.load_dxf()
-        self.entities = processor.get_lines() + processor.get_polylines()
-
-        perimeter = Calculations.calculate_perimeter(self.entities)
-        centerline = Calculations.calculate_centerline_length(self.entities)
-
-        self.show_results(perimeter, centerline)
-
-    def show_results(self, perimeter, centerline):
-        """Displays the calculated results."""
-        self.clear_frame()
-        
-        label = ttk.Label(self.root, text=f"Perimeter: {perimeter:.2f} units\nCenterline Length: {centerline:.2f} units")
-        label.pack(pady=20)
-
-    def clear_frame(self):
-        """Removes existing UI elements."""
-        for widget in self.root.winfo_children():
-            widget.destroy()
+    label = ttk.Label(self.root, text=result_text, font=("Helvetica", 12))
+    label.pack(pady=20)
