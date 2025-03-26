@@ -1,9 +1,9 @@
 {
     "version": 2,
     "builds": [
-        { "src": "src/app.py", "use": "@vercel/python", "config": { "runtime": "python3.9" } }
+        { "src": "app.py", "use": "@vercel/python" }
     ],
     "routes": [
-        { "src": "/api/analyze", "dest": "src/app.py" }
+        { "src": "/api/analyze", "dest": "app.py" }
     ]
 }
