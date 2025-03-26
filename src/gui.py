@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import random
-from dxf_processor import DXFProcessor
-from calculations import Calculations
+import os
+import ezdxf
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
@@ -10,12 +10,18 @@ from matplotlib.figure import Figure
 class BlueprintIQApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("BlueprintIQ - Civil Engineering DXF Analyzer")
+        self.root.title("Home Page")
         self.root.geometry("1000x700")
-        self.root.configure(bg="#F0F0F0")  # Light gray background
+        self.root.configure(bg="#2E3B55")  # Engineering dark theme
 
         self.file_path = None
         self.entities = []
+        self.history = []
+        self.internal_length = 0
+        self.external_length = 0
+        self.internal_breadth = 0
+        self.external_breadth = 0
+        self.perimeter = 0
         self.mottos = [
             "Precision is the key to great engineering.",
             "A strong foundation leads to a strong structure.",
@@ -40,99 +46,136 @@ class BlueprintIQApp:
         return motto
 
     def create_home_screen(self):
-        """Creates the home screen UI."""
+        """Creates the home screen UI with history and exit button."""
         self.clear_frame()
 
         frame = ttk.Frame(self.root, padding=20)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        title = ttk.Label(frame, text="BlueprintIQ - DXF Analyzer", font=("Helvetica", 18, "bold"))
+        title = ttk.Label(frame, text="DXF Analyzer", font=("Helvetica", 18, "bold"), background="#2E3B55", foreground="white")
         title.pack(pady=20)
 
-        select_btn = ttk.Button(frame, text="📂 Select DXF File", command=self.select_file, style="TButton")
+        select_btn = ttk.Button(frame, text="📂 Select DXF File", command=self.select_file)
         select_btn.pack(pady=10)
+
+        # Recent History Section
+        if self.history:
+            history_label = ttk.Label(frame, text="📜 Recent Files:", font=("Helvetica", 12, "bold"), background="#2E3B55", foreground="white")
+            history_label.pack(pady=5)
+            for file in self.history[-3:]:  # Show last 3 analyzed files
+                ttk.Label(frame, text=f"🔹 {os.path.basename(file)}", background="#2E3B55", foreground="white").pack()
+
+        # Exit Button at Bottom Right
+        exit_btn = ttk.Button(frame, text="❌ Exit", command=self.exit_app)
+        exit_btn.pack(side=tk.BOTTOM, pady=20)
 
     def select_file(self):
         """Opens file dialog to select a DXF file."""
         self.file_path = filedialog.askopenfilename(filetypes=[("DXF files", "*.dxf")])
         if self.file_path:
+            self.history.append(self.file_path)  # Add to history
             self.process_file()
 
     def process_file(self):
-        """Processes the DXF file and calculates dimensions and perimeter."""
-        processor = DXFProcessor(self.file_path)
-        processor.load_dxf()
-        self.entities = processor.get_lines() + processor.get_polylines()
-
-        # Compute internal and external dimensions
-        l, L, b, B = Calculations.calculate_dimensions(self.entities)
-
-        # Compute perimeter
-        perimeter = Calculations.calculate_perimeter(l, L, b, B)
-
-        self.show_results(l, L, b, B, perimeter)
-
-    def show_results(self, l, L, b, B, perimeter):
-        """Displays the results and DXF preview with labels."""
-        self.clear_frame()
+        """Processes the DXF file and extracts drawing data."""
+        doc = ezdxf.readfile(self.file_path)
+        msp = doc.modelspace()
         
+        # Extract entities (Lines and Polylines)
+        self.entities = [e for e in msp.query('LINE POLYLINE LWPOLYLINE')]
+
+        if not self.entities:
+            messagebox.showerror("Error", "No valid entities found in the DXF file.")
+            return
+
+        # Compute dimensions
+        self.calculate_dimensions()
+
+        # Show results & preview
+        self.show_results()
+
+    def calculate_dimensions(self):
+        """Calculates internal & external length, breadth, and perimeter."""
+        x_coords = []
+        y_coords = []
+
+        for entity in self.entities:
+            if entity.dxftype() == 'LINE':
+                x_coords.extend([entity.dxf.start.x, entity.dxf.end.x])
+                y_coords.extend([entity.dxf.start.y, entity.dxf.end.y])
+            elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
+                points = [(p[0], p[1]) for p in entity.get_points()]
+                x_coords.extend([p[0] for p in points])
+                y_coords.extend([p[1] for p in points])
+
+        # Calculate dimensions
+        min_x, max_x = min(x_coords), max(x_coords)
+        min_y, max_y = min(y_coords), max(y_coords)
+
+        self.internal_length = max_x - min_x
+        self.internal_breadth = max_y - min_y
+        self.external_length = self.internal_length * 1.02  # Example: 2% extra for walls
+        self.external_breadth = self.internal_breadth * 1.02
+
+        w = self.external_length - self.internal_length
+        k = self.external_breadth - self.internal_breadth
+        self.perimeter = 2 * ((self.internal_length + w / 2) + (self.internal_breadth + k / 2))
+
+    def show_results(self):
+        """Displays the results and DXF preview with buttons correctly placed."""
+        self.clear_frame()
+
         frame = ttk.Frame(self.root, padding=20)
         frame.pack(expand=True, fill=tk.BOTH)
 
-        # Engineering Motto
-        motto_label = ttk.Label(frame, text=f"🏗️ Engineering Motto: {self.get_unique_motto()}", 
-                                font=("Helvetica", 12, "italic"), foreground="blue")
+        motto_label = ttk.Label(frame, text=f"🏗️ Engineering Motto: {self.get_unique_motto()}", font=("Helvetica", 12, "italic"), background="#2E3B55", foreground="lightblue")
         motto_label.pack(pady=5)
 
-        # Results section
-        result_text = f"""
-        📏 Internal Length (l): {l:.2f} units
-        📐 External Length (L): {L:.2f} units
-        🏗 Internal Breadth (b): {b:.2f} units
-        🏠 External Breadth (B): {B:.2f} units
-        🔲 Perimeter: {perimeter:.2f} units
+        results_text = f"""
+        📏 Internal Length (l): {self.internal_length:.2f} units
+        📐 External Length (L): {self.external_length:.2f} units
+        📏 Internal Breadth (b): {self.internal_breadth:.2f} units
+        📐 External Breadth (B): {self.external_breadth:.2f} units
+        🔲 Perimeter: {self.perimeter:.2f} units
         """
+        results_label = ttk.Label(frame, text=results_text, font=("Helvetica", 12), background="#2E3B55", foreground="white", justify="left")
+        results_label.pack(pady=10)
 
-        label = ttk.Label(frame, text=result_text, font=("Helvetica", 12), justify=tk.LEFT)
-        label.pack(pady=10)
-
-        # Create a visualization canvas
+        # Visualization
         viz_frame = ttk.Frame(frame)
         viz_frame.pack(fill=tk.BOTH, expand=True)
 
-        fig = Figure(figsize=(6, 6), facecolor="white")
+        fig = Figure(figsize=(4, 4), facecolor="white")  # **Reduced from 6x6 to 4x4**
         ax = fig.add_subplot(111)
-        ax.set_facecolor("#F0F0F0")
         ax.set_title("DXF Blueprint Preview", color="black")
-        ax.tick_params(colors="black")
 
-        self.plot_entities(ax, l, L, b, B)
+        self.plot_entities(ax)
 
         canvas = FigureCanvasTkAgg(fig, master=viz_frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        back_btn = ttk.Button(frame, text="🔙 Back to Home", command=self.create_home_screen, style="TButton")
-        back_btn.pack(pady=10)
+        # Buttons at Bottom Left & Right
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=20)
 
-    def plot_entities(self, ax, l, L, b, B):
-        """Visualizes DXF entities with labeled dimensions."""
+        home_btn = ttk.Button(btn_frame, text="🏠 Return to Home", command=self.create_home_screen)
+        home_btn.pack(side=tk.LEFT, padx=20)
+
+        analyze_again_btn = ttk.Button(btn_frame, text="🔄 Analyze Again", command=self.select_file)
+        analyze_again_btn.pack(side=tk.RIGHT, padx=20)
+
+    def plot_entities(self, ax):
+        """Visualizes DXF entities properly."""
         for entity in self.entities:
             if entity.dxftype() == 'LINE':
-                x = [entity.dxf.start[0], entity.dxf.end[0]]
-                y = [entity.dxf.start[1], entity.dxf.end[1]]
-                ax.plot(x, y, color="black", linewidth=1)
-
-            elif entity.dxftype() == 'LWPOLYLINE':
-                points = list(entity.vertices())
-                poly = plt.Polygon([point[:2] for point in points], closed=True, fill=False, edgecolor="blue")
-                ax.add_patch(poly)
-
-        # Add labels for dimensions
-        ax.text(L / 2, -2, f"External Length (L) = {L:.2f}", fontsize=10, color="red", ha="center")
-        ax.text(l / 2, -4, f"Internal Length (l) = {l:.2f}", fontsize=10, color="blue", ha="center")
-        ax.text(-2, B / 2, f"External Breadth (B) = {B:.2f}", fontsize=10, color="red", rotation=90, va="center")
-        ax.text(-4, b / 2, f"Internal Breadth (b) = {b:.2f}", fontsize=10, color="blue", rotation=90, va="center")
+                x = [entity.dxf.start.x, entity.dxf.end.x]
+                y = [entity.dxf.start.y, entity.dxf.end.y]
+                ax.plot(x, y, color="black", linewidth=2)
+            elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
+                points = [(p[0], p[1]) for p in entity.get_points()]
+                x, y = zip(*points)
+                ax.plot(x, y, color="black", linewidth=2)
 
         ax.autoscale()
 
@@ -141,9 +184,9 @@ class BlueprintIQApp:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-# Custom Styles
-style = ttk.Style()
-style.configure("TButton", font=("Helvetica", 12, "bold"), padding=10)
+    def exit_app(self):
+        """Closes the application."""
+        self.root.quit()
 
 if __name__ == "__main__":
     root = tk.Tk()
