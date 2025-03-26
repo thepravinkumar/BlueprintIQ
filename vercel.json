@@ -1,16 +1,12 @@
-
----
-
-## **8️⃣ `vercel.json` (Vercel Deployment Config)**
-This file tells **Vercel** how to deploy the app.
-
-```json
 {
-  "version": 2,
-  "builds": [
-    { "src": "src/main.py", "use": "vercel-python" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "src/main.py" }
-  ]
-}
+    "version": 2,
+    "builds": [
+      { "src": "src/app.py", "use": "@vercel/python" },
+      { "src": "public/**", "use": "@vercel/static" }
+    ],
+    "routes": [
+      { "src": "/analyze", "dest": "src/app.py" },
+      { "src": "/(.*)", "dest": "public/index.html" }
+    ]
+  }
+  
